@@ -4,10 +4,214 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>The Museum of Chinese Culture on Tiger-Designed Ceramics</title>
+    <style>
+      #site-nav {
+        position: fixed;
+        top: 4vh;
+        right: 3vw;
+        z-index: 9999;
+        display: inline-flex;
+        align-items: center;
+        gap: 18px;
+        color: #fff;
+        font: 300 10px/1 Helvetica, Arial, sans-serif;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        mix-blend-mode: difference;
+      }
+
+      #site-nav button {
+        appearance: none;
+        border: 0;
+        padding: 0;
+        margin: 0;
+        background: transparent;
+        color: rgba(255, 255, 255, 0.72);
+        font: inherit;
+        letter-spacing: inherit;
+        text-transform: inherit;
+        cursor: pointer;
+        transition: color 160ms ease, opacity 160ms ease;
+      }
+
+      #site-nav button:hover {
+        color: #fff;
+      }
+
+      #site-nav .nav-divider {
+        width: 1px;
+        height: 10px;
+        background: rgba(255, 255, 255, 0.24);
+      }
+
+      #site-nav[data-lang="en"] [data-lang-choice="en"],
+      #site-nav[data-lang="zh"] [data-lang-choice="zh"] {
+        color: #fff;
+      }
+    </style>
     <script type="module" crossorigin src="./assets/index-v105-refresh.js"></script>
     <link rel="stylesheet" crossorigin href="./assets/index-v105-refresh.css">
   </head>
   <body>
+    <nav id="site-nav" aria-label="Site navigation" data-lang="en">
+      <button type="button" data-nav="home">Home</button>
+      <button type="button" data-nav="time">Time</button>
+      <button type="button" data-nav="collection">Collection</button>
+      <span class="nav-divider" aria-hidden="true"></span>
+      <button type="button" data-lang-choice="en">EN</button>
+      <button type="button" data-lang-choice="zh">中</button>
+    </nav>
     <div id="root"></div>
+    <script>
+      (function () {
+        const STORAGE_KEY = "cctc-site-lang";
+        const nav = document.getElementById("site-nav");
+
+        const translations = {
+          "The Museum of Chinese Culture on Tiger-Designed Ceramics": "中国瓷器虎文化博物馆",
+          "Saturation & Time": "饱和度与时间",
+          "Selected Works": "馆藏精选",
+          "About the Museum": "关于博物馆",
+          "CLICK ANYWHERE TO CONTINUE": "点击任意位置继续",
+          "Click outside to close": "点击空白处关闭",
+          "Home": "首页",
+          "SCROLL": "滚动",
+          "Founded in 2016, it is China's first private museum dedicated to the Chinese culture on tiger-designed ceramics. The online museum opened in November 2020 with a collection spanning from the Han dynasty to the modern era. Its purposes include research and display of Chinese tiger culture and art, protection and inheritance of the spirit of Chinese tiger culture, and dissemination of Chinese fine traditional culture. Honorary Curator: Jubo Ouyang, professor of Wuhan Textile University. Executive Curator: Sihua Huang, Ph.D. of Universiti Putra Malaysia.": "本馆创建于2016年，是中国第一家以中国瓷器虎文化为主题的民营博物馆。线上博物馆于2020年11月开放，馆藏时间跨度从汉代延续至改革开放后的近现代时期。博物馆以中国虎文化与虎纹陶瓷艺术的研究、展示、保护、传承与传播为宗旨，致力于弘扬中华优秀传统文化与民族精神。名誉馆长为武汉纺织大学教授欧阳钜波，执行馆长为马来西亚博特拉大学博士、嘉应学院美术学院高级讲师黄思华。"
+        };
+
+        let currentLang = localStorage.getItem(STORAGE_KEY) || "en";
+
+        const navLabels = {
+          en: { home: "Home", time: "Time", collection: "Collection" },
+          zh: { home: "首页", time: "时间", collection: "馆藏" }
+        };
+
+        function setButtonState() {
+          nav.setAttribute("data-lang", currentLang);
+          document.documentElement.lang = currentLang === "zh" ? "zh-CN" : "en";
+          for (const [key, label] of Object.entries(navLabels[currentLang])) {
+            const button = nav.querySelector(`[data-nav="${key}"]`);
+            if (button) button.textContent = label;
+          }
+        }
+
+        function walkText(node) {
+          if (node.nodeType === Node.TEXT_NODE) {
+            const raw = node.nodeValue;
+            if (!raw) return;
+            const trimmed = raw.trim();
+            if (!trimmed) return;
+
+            if (currentLang === "zh") {
+              if (!(trimmed in translations)) return;
+              node.nodeValue = raw.replace(trimmed, translations[trimmed]);
+            } else {
+              const entry = Object.entries(translations).find(([, value]) => value === trimmed);
+              if (entry) {
+                node.nodeValue = raw.replace(trimmed, entry[0]);
+              }
+            }
+            return;
+          }
+
+          if (node.nodeType !== Node.ELEMENT_NODE) return;
+          for (const child of node.childNodes) walkText(child);
+        }
+
+        function applyLanguage() {
+          setButtonState();
+          walkText(document.body);
+          hideBuiltInHomeLinks();
+        }
+
+        function hideBuiltInHomeLinks() {
+          const walker = document.createTreeWalker(document.getElementById("root"), NodeFilter.SHOW_TEXT);
+          const homeText = new Set(["Home", "首页"]);
+          while (walker.nextNode()) {
+            const node = walker.currentNode;
+            if (!homeText.has((node.nodeValue || "").trim())) continue;
+            const holder = node.parentElement && node.parentElement.parentElement;
+            if (holder) {
+              holder.style.visibility = "hidden";
+              holder.style.pointerEvents = "none";
+            }
+          }
+        }
+
+        function textElementMatches(element, texts) {
+          return texts.includes((element.textContent || "").trim());
+        }
+
+        function findRenderedText(texts) {
+          const nodes = Array.from(document.querySelectorAll("h1,h2,h3,p,span,div"));
+          return nodes.find((node) => textElementMatches(node, texts));
+        }
+
+        function openContentThen(callback) {
+          const existing = findRenderedText(["Saturation & Time", "饱和度与时间", "Selected Works", "馆藏精选"]);
+          if (existing) {
+            callback();
+            return;
+          }
+
+          window.dispatchEvent(new KeyboardEvent("keydown", { key: "c", bubbles: true }));
+          const continueButton = findRenderedText(["CLICK ANYWHERE TO CONTINUE", "点击任意位置继续"]);
+          if (continueButton) continueButton.click();
+
+          let attempts = 0;
+          const timer = window.setInterval(function () {
+            attempts += 1;
+            const ready = findRenderedText(["Saturation & Time", "饱和度与时间", "Selected Works", "馆藏精选"]);
+            if (ready || attempts > 20) {
+              window.clearInterval(timer);
+              callback();
+            }
+          }, 120);
+        }
+
+        function scrollToText(texts) {
+          openContentThen(function () {
+            const target = findRenderedText(texts);
+            if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+          });
+        }
+
+        nav.addEventListener("click", function (event) {
+          const button = event.target.closest("button");
+          if (!button) return;
+
+          const langChoice = button.getAttribute("data-lang-choice");
+          if (langChoice) {
+            currentLang = langChoice;
+            localStorage.setItem(STORAGE_KEY, currentLang);
+            applyLanguage();
+            return;
+          }
+
+          const destination = button.getAttribute("data-nav");
+          if (destination === "home") {
+            window.location.assign(window.location.pathname);
+          }
+          if (destination === "time") {
+            scrollToText(["Saturation & Time", "饱和度与时间"]);
+          }
+          if (destination === "collection") {
+            scrollToText(["Selected Works", "馆藏精选"]);
+          }
+        });
+
+        const observer = new MutationObserver(function () {
+          applyLanguage();
+        });
+
+        observer.observe(document.getElementById("root"), {
+          childList: true,
+          subtree: true,
+          characterData: true
+        });
+
+        applyLanguage();
+      })();
+    </script>
   </body>
 </html>
